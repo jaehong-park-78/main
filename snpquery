@@ -1,5 +1,4 @@
 
-# Ref1: genetika@https://cafe.naver.com/worldethnic
 class MySnp(object):
     def __init__(self):
         init=0
