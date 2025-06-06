@@ -72,8 +72,8 @@ Where `R_ij(t)` is the resonance between entity *i* and entity *j* over time.
 ---
 
 ## 📁 Included in this Repository
-
-- `FWR.pdf` – Philosophical foundations of FWR  
+txt2pdf_6842c51172da2 (1).pdf
+– Philosophical foundations of FWR 
 - `README.md` – This file  
 - fwr song
 
