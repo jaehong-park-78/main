@@ -340,14 +340,6 @@ Whitehead, A.N. (1929). *Process and Reality: An Essay in Cosmology*. New York: 
 ---
 
 **Author Information:**
-[Corresponding Author Details]
-[Institutional Affiliation]
-[Contact Information]
+[박재홍, park jaehong]
+[mr8nav3r@naver.com]
 
-**Funding:** [Funding Information]
-
-**Acknowledgments:** [Acknowledgment Details]
-
-**Conflicts of Interest:** The authors declare no conflicts of interest.
-
-**Data Availability Statement:** [Data availability information]
