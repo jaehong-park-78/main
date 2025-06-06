@@ -80,6 +80,7 @@ txt2pdf_6842c51172da2 (1).pdf
 ## 📜 License & Usage Policy
 
 © 2025 by FWR Creator (mr8nav3r@naver.com)
+cid: bafybeicsambp7wj7i4nbfava2quplce3dqc2r2f7wboevargycbja7yeai
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
 (CC BY-NC-SA 4.0)
