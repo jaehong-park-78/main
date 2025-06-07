@@ -1,7 +1,6 @@
 # FWR Ontology: A Dynamic Model of Being Through Flow-Wave-Resonance Interactions
 
 **Author:** Park Jaehong  
-**Affiliation:** [Institution to be specified]  
 **Email:** mr8nav3r@naver.com
 
 ---
@@ -403,17 +402,3 @@ Park, J. (2025). Preliminary validation of the FWR Personal Assessment Scale. *M
 Whitehead, A. N. (1929). *Process and Reality: An Essay in Cosmology*. New York: Macmillan.
 
 ---
-
-**Corresponding Author:**  
-Park Jaehong  
-Email: mr8nav3r@naver.com
-
-**Received:** [Date]  
-**Accepted:** [Date]  
-**Published:** [Date]
-
-**Funding:** This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors.
-
-**Conflicts of Interest:** The author declares no conflicts of interest.
-
-**Data Availability Statement:** Data supporting the conclusions of this article will be made available upon reasonable request to the corresponding author.
