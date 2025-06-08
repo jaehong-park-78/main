@@ -312,12 +312,6 @@ Lyapunov exponents determine stability:
 - **Background**: IT startup B’s growth from founding to 50 employees.
 - **Stages**: Preservation (clear roles) → Fusion (team unity) → Generation (new products) → Separation (specialization).
 - **Results**: Peak productivity in Generation, highest satisfaction in Fusion.
-
-### C.3 Educational Case: Collaborative Learning
-- **Background**: FWR-based physics class.
-- **Application**: Individualized paths (Flow), cyclical learning (Wave), group resonance.
-- **Results**: 35% increased participation, 28% improved understanding, 42% higher satisfaction.
-
 ---
 
 ## Appendix D: Cultural Application Studies
