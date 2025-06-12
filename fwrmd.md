@@ -236,7 +236,6 @@ FWR Ontology redefines existence as a dynamic process and truth as a relational 
 
 ## Author Information
 **Jaehong Park**  
-Email: [mr8naver@naver.com]
 
 ---
 
