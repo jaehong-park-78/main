@@ -1,4 +1,3 @@
-Below is the translation of your text into English, maintaining the structure, tone, and philosophical essence of your original writing. I’ve ensured the concepts of Flow, Wave, and Resonance (FWR) are 
 
 ### The Origin of Language in Infants (FWR Interpretation)
 
