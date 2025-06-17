@@ -255,7 +255,9 @@ def train_clustering(
     num_clusters: int = 10,
     num_epochs: int = 100,
     lr: float = 0.01,
+    betas: tuple = (0.95, 0.999, 0.9), # betas 파라미터 추가
     waveform: str = "sin",
+    max_grad_norm: float = 0.5, # max_grad_norm 파라미터 추가
     batch_size: int = 256,
     num_samples: int = 10000 # 추출할 샘플 수 파라미터 추가
 ) -> tuple[float, float, float, str]:
@@ -268,7 +270,9 @@ def train_clustering(
         num_clusters (int): 클러스터의 수. (기본값: 10)
         num_epochs (int): 학습 에포크 수. (기본값: 100)
         lr (float): 학습률. (기본값: 0.01)
+        betas (tuple): FWROptimizer에 사용될 betas 튜플.
         waveform (str): FWROptimizer에 사용될 파형. (기본값: "sin")
+        max_grad_norm (float): FWROptimizer에 사용될 최대 그래디언트 노름.
         batch_size (int): 학습 배치 크기. (기본값: 256)
         num_samples (int): CIFAR-10에서 특성 추출에 사용할 샘플 수. (기본값: 10000)
 
@@ -322,17 +326,15 @@ def train_clustering(
 
     # 3. 옵티마이저 초기화
     if optimizer_class == FWROptimizer:
-        # 특정 파형에 따라 LR 다르게 설정
-        current_lr = lr if waveform in ["sin", "tanh"] else 0.0001
         optimizer = optimizer_class(
             model.parameters(),
-            lr=current_lr,
-            betas=(0.95, 0.999, 0.9),
+            lr=lr, # train_clustering으로 전달된 lr 사용
+            betas=betas, # train_clustering으로 전달된 betas 사용
             weight_decay=0,
             waveform=waveform,
-            max_grad_norm=0.5
+            max_grad_norm=max_grad_norm # train_clustering으로 전달된 max_grad_norm 사용
         )
-        print(f"   FWROptimizer ({waveform}) 초기화됨. 학습률: {current_lr}")
+        print(f"   FWROptimizer ({waveform}) 초기화됨. 학습률: {lr}, betas: {betas}, max_grad_norm: {max_grad_norm}")
     elif optimizer_class == torch.optim.Adam:
         optimizer = optimizer_class(
             model.parameters(),
@@ -370,9 +372,6 @@ def train_clustering(
             data_batch = data_batch.to(device) # 데이터를 장치로 이동
             optimizer.zero_grad()
 
-            # --- CORRECTED LINE FOR autocast ---
-            # Use torch.amp.autocast('cuda', dtype=torch.float16) as per warnings
-            # The 'enabled' argument is automatically handled if the first arg is the device type
             with autocast(device.type, dtype=torch.float16):
                 distances_sq = model(data_batch)
                 # 각 데이터 포인트에 가장 가까운 프로토타입까지의 거리 제곱을 손실로 사용
@@ -424,52 +423,80 @@ def train_clustering(
 if __name__ == '__main__':
     # 하이퍼파라미터 설정
     NUM_CLUSTERS = 10
-    NUM_EPOCHS = 100 # 충분한 반복을 위해 100으로 설정
-    LEARNING_RATE = 0.01
+    NUM_EPOCHS = 100
     BATCH_SIZE = 256
-    NUM_SAMPLES_FOR_FEATURES = 10000 # 특성 추출에 사용할 샘플 수 (메모리 제약 고려)
+    NUM_SAMPLES_FOR_FEATURES = 10000
 
     optimizers_results = []
 
     print(f"\n===== 클러스터링 실험 시작 (총 {NUM_SAMPLES_FOR_FEATURES}개 샘플 사용) =====")
 
-    # 1. FWROptimizer with different waveforms
-    waveforms = ["sin", "tanh", "cos", "sawtooth"]
-    for waveform_type in waveforms:
-        print(f"\n--- FWROptimizer ({waveform_type}) 실험 ---")
-        time_res, loss_res, sil_score_res, name_res = train_clustering(
-            FWROptimizer,
-            f"FWROptimizer ({waveform_type})",
-            num_clusters=NUM_CLUSTERS,
-            num_epochs=NUM_EPOCHS,
-            lr=LEARNING_RATE,
-            waveform=waveform_type,
-            batch_size=BATCH_SIZE,
-            num_samples=NUM_SAMPLES_FOR_FEATURES
-        )
-        optimizers_results.append((name_res, time_res, loss_res, sil_score_res))
+    # 최적 파라미터 정의 (Sawtooth 랜덤 탐색 결과)
+    optimized_params = {
+        'lr': 0.0008062437517113646,
+        'betas': (0.95, 0.999, 0.8904040404040403),
+        'max_grad_norm': 1.6737373737373737
+    }
 
-    # 2. Adam
+    # 1. FWROptimizer (sawtooth) with optimized parameters
+    print(f"\n--- FWROptimizer (sawtooth) - 최적화된 파라미터 적용 ---")
+    time_res, loss_res, sil_score_res, name_res = train_clustering(
+        FWROptimizer,
+        "FWROptimizer (sawtooth) Optimized",
+        num_clusters=NUM_CLUSTERS,
+        num_epochs=NUM_EPOCHS,
+        lr=optimized_params['lr'],
+        betas=optimized_params['betas'],
+        waveform="sawtooth",
+        max_grad_norm=optimized_params['max_grad_norm'],
+        batch_size=BATCH_SIZE,
+        num_samples=NUM_SAMPLES_FOR_FEATURES
+    )
+    optimizers_results.append((name_res, time_res, loss_res, sil_score_res))
+
+    # 2. FWROptimizer (sin) with optimized parameters (Sawtooth와 동일하게 적용)
+    print(f"\n--- FWROptimizer (sin) - Sawtooth 최적 파라미터 적용 ---")
+    time_res, loss_res, sil_score_res, name_res = train_clustering(
+        FWROptimizer,
+        f"FWROptimizer (sin) Optimized",
+        num_clusters=NUM_CLUSTERS,
+        num_epochs=NUM_EPOCHS,
+        lr=optimized_params['lr'],
+        betas=optimized_params['betas'],
+        waveform="sin", # waveform만 "sin"으로 변경
+        max_grad_norm=optimized_params['max_grad_norm'],
+        batch_size=BATCH_SIZE,
+        num_samples=NUM_SAMPLES_FOR_FEATURES
+    )
+    optimizers_results.append((name_res, time_res, loss_res, sil_score_res))
+
+    # 3. Adam (기존 파라미터 유지)
     print("\n--- Adam 옵티마이저 실험 ---")
     time_res, loss_res, sil_score_res, name_res = train_clustering(
         torch.optim.Adam,
         "Adam",
         num_clusters=NUM_CLUSTERS,
         num_epochs=NUM_EPOCHS,
-        lr=LEARNING_RATE,
+        lr=0.01, # Adam의 lr은 0.01로 고정
+        betas=(0.9, 0.999, 0.9), # Adam에는 beta3가 없지만, 함수 시그니처를 위해 전달 (내부적으로 사용되지 않음)
+        waveform="sin", # Adam에는 waveform이 없지만, 함수 시그니처를 위해 전달 (내부적으로 사용되지 않음)
+        max_grad_norm=0.5, # Adam에는 max_grad_norm이 없지만, 함수 시그니처를 위해 전달 (내부적으로 사용되지 않음)
         batch_size=BATCH_SIZE,
         num_samples=NUM_SAMPLES_FOR_FEATURES
     )
     optimizers_results.append((name_res, time_res, loss_res, sil_score_res))
 
-    # 3. SGD
+    # 4. SGD (기존 파라미터 유지)
     print("\n--- SGD 옵티마이저 실험 ---")
     time_res, loss_res, sil_score_res, name_res = train_clustering(
         torch.optim.SGD,
         "SGD",
         num_clusters=NUM_CLUSTERS,
         num_epochs=NUM_EPOCHS,
-        lr=LEARNING_RATE,
+        lr=0.01, # SGD의 lr은 0.01로 고정
+        betas=(0.9, 0.999, 0.9), # SGD에는 beta3가 없지만, 함수 시그니처를 위해 전달
+        waveform="sin", # SGD에는 waveform이 없지만, 함수 시그니처를 위해 전달
+        max_grad_norm=0.5, # SGD에는 max_grad_norm이 없지만, 함수 시그니처를 위해 전달
         batch_size=BATCH_SIZE,
         num_samples=NUM_SAMPLES_FOR_FEATURES
     )
