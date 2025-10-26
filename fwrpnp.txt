@@ -68,5 +68,3 @@ FWR collapses P=NP via resonance, with poly proofs/simulations. Future: UNSAT, q
 [3] Hajek (1988). Oper. Res.  
 [4] Selman et al. (1997). AAAI.  
 [5] Eén & Sörensson (2003). SAT.  
-
-*(SymPy: dsolve verified DE; total 2 pages condensed.)*
