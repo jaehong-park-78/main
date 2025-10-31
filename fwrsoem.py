@@ -1,4 +1,4 @@
-#FWR Self-Organizing Evolution Model
+#FWR AGI SELF ORGANIZATION
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -67,10 +67,12 @@ def evolve_fwr_system(flow_len=256, epochs=400, lr_f=0.004, lr_w=0.008,
         r_metric, eff, corr, s_in, s_out = compute_r_metric_torch(flow, wave)
         loss = -r_metric
 
-        # 비대칭 업데이트 (F ↔ W)
-        (beta * loss).backward(retain_graph=True)
-        opt_f.step()
+        # 비대칭 업데이트 (F ↔ W): 수정된 버전
+        # 한 번 backward 후 flow.grad 스케일링으로 그래프 안정화
         loss.backward()
+        if flow.grad is not None:
+            flow.grad *= beta
+        opt_f.step()
         opt_w.step()
 
         # 감쇠 적용 (물리적 시간항)
