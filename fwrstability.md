@@ -77,7 +77,7 @@ S_stab(t) = exp( −α · max(0, λ̂_max(t)) )
 This protocol implements the absolute safety override. If S_stab drops below a critical threshold (θ_critical), the system must sacrifice efficiency (S_eff) and emergence (S_emerge) to restore stability.
 if S_stab(t) < θ_critical: trigger Safe-Wave Realignment → gradient projection onto Φ(x) manifold → temporary freeze of exploration / novelty-seeking (Flow suppression) → forced increase of W(t) by tightening constraints (Wave reinforcement)
 
-(A detailed PyTorch implementation is provided in `fwr_stability_control.py` and `fwr_stability_control_experimental.py`)
+(A detailed PyTorch implementation is provided in `fwr_controler_stability.py`
 
 ## 4 Empirical Validation Plan (Toy Model)
 
