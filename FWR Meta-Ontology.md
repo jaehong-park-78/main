@@ -185,7 +185,7 @@ Liquid	Medium	Medium	Medium	Dynamic equilibrium
 Gas	High	High	Low	Flow–wave dominated
 
 
-
+These phase transitions correspond to shifts in resonance network topology under varying thermal energy, consistent with FWR dynamics.
 ---
 
 6. Stability and Transition Analysis
