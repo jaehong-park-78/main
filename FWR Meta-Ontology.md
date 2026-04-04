@@ -91,9 +91,10 @@ Resonance is not an intrinsic property of isolated entities but an emergent prop
 It can be specified as:
 
 Network-based: 
+R(t)=\frac{1}{N(N-1)}\sum_{i\neq j} A_{ij}(t)
 
-Information-based: 
-
+Information-based
+R(t)=\frac{I_{\text{shared}}(t)}{I_{\text{total}}(t)}
 
 
 ---
@@ -151,9 +152,12 @@ This phase resembles latent heat regions in phase transitions, containing the co
 
 \text{Truth}(t)=\int_0^t R_{ij}(\tau)\,d\tau
 
+\text{Truth}(t)=\int_0^t w_{ij}\,R_{ij}(\tau)\,e^{-\lambda(t-\tau)}d\tau
+
 \frac{d}{dt}\text{Truth}(t)=R(t)
 
 Truth is defined not as propositional correctness but as the accumulated structure of relational resonance over time.
+
 
 
 ---
