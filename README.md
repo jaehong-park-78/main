@@ -285,7 +285,7 @@ $$(F,\, W,\, R) \;\rightarrow\; (F',\, W',\, R')$$
 - Crisis is not destruction, but a **transition phase**.
 - Truth is not discovered, but **accumulated through resonance over time**.
 - Evolution is not replacement, but **reconfiguration of relational structure**.
-- R(t) is the entropy efficiency factor.
+- R(t): A function space that normalizes and expresses entropy reduction efficiency or structural interdependence.
 ---
 
 📁 저장소 구성
