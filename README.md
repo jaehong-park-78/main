@@ -286,6 +286,7 @@ $$(F,\, W,\, R) \;\rightarrow\; (F',\, W',\, R')$$
 - Truth is not discovered, but **accumulated through resonance over time**.
 - Evolution is not replacement, but **reconfiguration of relational structure**.
 - R(t): A function space that normalizes and expresses entropy reduction efficiency or structural interdependence.
+- Truth is not infinitely accumulating information, but a state of structural completion where resonance unites and no longer differentiates.
 ---
 
 📁 저장소 구성
