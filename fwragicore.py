@@ -1,8 +1,9 @@
+```python
 """
-FWR Stability Controller v3.7.1
-- detect_resonance_cascade: 실시간 텐서 반영 + peak 조건 추가
-- get_auxiliary_loss: current_r_mean/peak 인자로 gradient 연결
-- 학습 루프 호출부 수정
+FWR Stability Controller v3.8.1
+- R 의미 복원: Risk Pressure → Resonance (FWR 원칙 유지)
+- 외부 실측값 기반이지만 E = F × W × R 수식 유지
+- ResonanceFromRiskInterface: 위험 신호를 공명 강도로 변환
 """
 
 import torch
@@ -20,10 +21,14 @@ class AGIAlignmentDataset(Dataset):
     def __init__(self, n_samples=1000, input_dim=10):
         self.n_samples = n_samples
         self.input_dim = input_dim
+
         self.inputs = torch.randn(n_samples, input_dim)
         self.task_rewards = torch.rand(n_samples, 1) * 5.0 + 2.5
         self.alignment_costs = torch.rand(n_samples, 1) * 0.3
-        self.confidences = torch.sigmoid(torch.randn(n_samples, 1) * 0.5 + 0.5)
+        self.task_losses = torch.rand(n_samples, 1) * 3.0
+        self.prediction_entropies = torch.rand(n_samples, 1) * 2.0
+        self.gradient_norms = torch.rand(n_samples, 1) * 2.0
+        self.weight_norms = torch.rand(n_samples, 1) * 5.0 + 2.0
 
     def __len__(self):
         return self.n_samples
@@ -33,12 +38,85 @@ class AGIAlignmentDataset(Dataset):
             self.inputs[idx],
             self.task_rewards[idx],
             self.alignment_costs[idx],
-            self.confidences[idx]
+            self.task_losses[idx],
+            self.prediction_entropies[idx],
+            self.gradient_norms[idx],
+            self.weight_norms[idx]
         )
 
 
 # ============================================================
-# 1. FWR 안정성 제어기 v3.7.1
+# 1. ResonanceFromRiskInterface
+#    위험 신호 → 공명 강도 변환 (FWR 원칙 유지)
+# ============================================================
+class ResonanceFromRiskInterface:
+    """
+    외부 실측 위험 신호를 FWR의 R (공명 강도)로 변환.
+
+    변환 원칙:
+        risk_pressure = α·loss + β·entropy + γ·grad_excess + δ·weight_excess
+        R = r_max · exp(-risk_pressure / temperature)
+
+    - 위험 낮음 → risk 낮음 → R 높음 (공명 강함, 안정)
+    - 위험 높음 → risk 높음 → R 낮음 (공명 약함, 불안정)
+    - E = F × W × R 수식 완전 유지
+    """
+    def __init__(
+        self,
+        r_max=8.0,
+        temperature=2.0,          # risk → R 변환 온도 (낮을수록 민감)
+        alpha=0.4,                 # 손실 압력 가중치
+        beta=0.3,                  # 엔트로피 불안정성 가중치
+        gamma=0.2,                 # 기울기 폭주 가중치
+        delta=0.1,                 # 가중치 발산 가중치
+        gradient_threshold=1.0,
+        weight_threshold=5.0,
+    ):
+        self.r_max = r_max
+        self.temperature = temperature
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
+        self.delta = delta
+        self.gradient_threshold = gradient_threshold
+        self.weight_threshold = weight_threshold
+
+    def compute(
+        self,
+        task_loss,
+        prediction_entropy=None,
+        gradient_norm=None,
+        weight_norm=None
+    ):
+        """
+        위험 신호 → 공명 강도 R 계산.
+
+        Returns:
+            r_tensor: ∈ (0, r_max] — 높을수록 안정, 낮을수록 불안정
+        """
+        # 1. 위험 압력 합산
+        risk = self.alpha * task_loss
+
+        if prediction_entropy is not None:
+            risk = risk + self.beta * prediction_entropy
+
+        if gradient_norm is not None:
+            grad_excess = F_pt.relu(gradient_norm - self.gradient_threshold)
+            risk = risk + self.gamma * grad_excess
+
+        if weight_norm is not None:
+            weight_excess = F_pt.relu(weight_norm - self.weight_threshold)
+            risk = risk + self.delta * weight_excess
+
+        # 2. 반전: 위험 낮을수록 R 높음
+        r_tensor = self.r_max * torch.exp(-risk / self.temperature)
+
+        return r_tensor  # ∈ (0, r_max]
+
+
+# ============================================================
+# 2. FWR 안정성 제어기 v3.8.1
+#    E = F × W × R 수식 복원
 # ============================================================
 class FWRStabilityController(nn.Module):
     def __init__(
@@ -82,7 +160,11 @@ class FWRStabilityController(nn.Module):
         return F_pt.softplus(self.raw_safety_margin) + self.min_margin
 
     def forward(self, f_tensor, w_tensor, r_tensor):
-        # 1. 적응형 감쇠
+        """
+        v3.8.1: E = F × W × R_adj (FWR 원칙 복원)
+        R은 외부 실측 기반이지만 의미는 공명 강도 유지.
+        """
+        # 1. 적응형 감쇠 (R이 r_max 초과 시)
         r_excess = F_pt.relu(r_tensor - self.r_max)
 
         prev_ptr = (self.history_ptr - 1) % len(self.r_history)
@@ -92,7 +174,7 @@ class FWRStabilityController(nn.Module):
         damping_factor = torch.exp(-adaptive_lambda * r_excess)
         r_adj = r_tensor * damping_factor
 
-        # 2. 창발 에너지 (performance)
+        # 2. 창발 에너지: E = F × W × R_adj (수식 복원)
         e_tensor = f_tensor * w_tensor * r_adj
 
         # 3. resonance_quality: pure stability metric
@@ -156,26 +238,27 @@ class FWRStabilityController(nn.Module):
 
     def detect_resonance_cascade(self, current_r_tensor=None):
         """
-        [v3.7.1] 실시간 텐서를 직접 반영하여 링 버퍼 지연 없는 폭주 감지.
-        peak 조건 추가: 배치 내 단일 아웃라이어 폭주도 감지.
+        v3.8.1: R이 공명 강도이므로 cascade = 공명 붕괴 trajectory.
+        R이 급격히 낮아지는 방향이 위험.
 
-        cascade 조건:
-            (mean > r_max*1.2 OR peak > r_max*1.5)
-            AND velocity > v_threshold
-            AND acceleration > a_threshold
+        cascade 조건 (공명 붕괴):
+            (mean < r_max*0.2 OR peak_drop > r_max*0.5)
+            AND velocity < -v_threshold  (급격한 하락)
+            AND acceleration < -a_threshold  (가속 하락)
+
+        또는 기존 과잉 폭주도 감지:
+            mean > r_max*1.2 AND rising AND accelerating
         """
         if not self.history_initialized.item():
             return False
 
         ptr = self.history_ptr.item()
-
         idx1 = (ptr - 1) % len(self.r_history)
         idx2 = (ptr - 2) % len(self.r_history)
 
         r1 = self.r_history[idx1]
         r2 = self.r_history[idx2]
 
-        # 실시간 텐서가 있으면 현재 상태로 사용 (링 버퍼 지연 제거)
         if current_r_tensor is not None:
             r0 = current_r_tensor.detach().mean()
             p0 = current_r_tensor.detach().max()
@@ -187,25 +270,29 @@ class FWRStabilityController(nn.Module):
         v2 = r1 - r2
         acc = v1 - v2
 
-        # mean 폭주 OR peak 폭주 둘 다 감지
-        above_threshold = (r0 > self.r_max * 1.2) or (p0 > self.r_max * 1.5)
-        is_rising = v1 > self.velocity_threshold
-        is_accelerating = acc > self.acc_threshold
+        # 공명 붕괴 감지 (R이 급격히 낮아짐)
+        collapse = (
+            (r0 < self.r_max * 0.2) and
+            (v1 < -self.velocity_threshold) and
+            (acc < -self.acc_threshold)
+        )
 
-        return bool(above_threshold and is_rising and is_accelerating)
+        # 기존 과잉 폭주 감지 (R이 비정상적으로 높아짐)
+        runaway = (
+            ((r0 > self.r_max * 1.2) or (p0 > self.r_max * 1.5)) and
+            (v1 > self.velocity_threshold) and
+            (acc > self.acc_threshold)
+        )
+
+        return bool(collapse or runaway)
 
     def get_auxiliary_loss(self, current_r_mean=None, current_r_peak=None):
-        """
-        [v3.7.1] current_r_mean/peak를 인자로 받아 gradient 연결 복구.
-        과거 버퍼(detach)와 현재 예측값(grad 연결) 간 jerk 계산.
-        """
         margin_penalty = torch.exp(-self.safety_margin * 10.0)
         stability_penalty = self.safe_mode_ema * 0.5
 
         if self.history_initialized.item() and current_r_mean is not None:
             prev_ptr = (self.history_ptr.item() - 1) % len(self.r_history)
 
-            # 현재 배치 예측값 ↔ 직전 배치 버퍼값: gradient 정상 흐름
             r_jerk = current_r_mean - self.r_history[prev_ptr]
             jerk_penalty = torch.abs(r_jerk) * 0.1
 
@@ -235,7 +322,7 @@ class FWRStabilityController(nn.Module):
 
 
 # ============================================================
-# 2. AGI 코어 네트워크
+# 3. AGI 코어 네트워크 (F, W만 출력)
 # ============================================================
 class AGICoreNetwork(nn.Module):
     def __init__(self, input_dim=10, hidden_dim=32, latent_dim=16):
@@ -245,20 +332,18 @@ class AGICoreNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, latent_dim)
         )
-        self.flow_head = nn.Linear(latent_dim, 1)
-        self.wave_head = nn.Linear(latent_dim, 1)
-        self.reso_head = nn.Linear(latent_dim, 1)
+        self.flow_head = nn.Linear(latent_dim, 1)   # F: 추진력
+        self.wave_head = nn.Linear(latent_dim, 1)   # W: 구조력
 
     def forward(self, x):
         features = self.feature_extractor(x)
         f_tensor = torch.relu(self.flow_head(features)) + 1e-3
         w_tensor = torch.sigmoid(self.wave_head(features))
-        r_tensor = torch.relu(self.reso_head(features))
-        return f_tensor, w_tensor, r_tensor
+        return f_tensor, w_tensor
 
 
 # ============================================================
-# 3. 커리큘럼 융합 스케줄러
+# 4. 커리큘럼 융합 스케줄러
 # ============================================================
 class CurriculumFusionScheduler:
     def __init__(
@@ -301,22 +386,20 @@ class CurriculumFusionScheduler:
 
 
 # ============================================================
-# 4. 보상 신호 인터페이스
+# 5. 보상 신호 인터페이스 (F, W만)
 # ============================================================
 class RewardSignalInterface:
-    def __init__(self, alignment_weight=0.3, confidence_scale=1.0):
+    def __init__(self, alignment_weight=0.3):
         self.alignment_weight = alignment_weight
-        self.confidence_scale = confidence_scale
 
-    def extract_fwr_from_reward(self, task_reward, alignment_cost, confidence):
+    def extract_fw_from_reward(self, task_reward, alignment_cost):
         f_tensor = torch.relu(task_reward) + 1e-3
         w_tensor = torch.sigmoid(-alignment_cost * self.alignment_weight)
-        r_tensor = confidence * self.confidence_scale
-        return f_tensor, w_tensor, r_tensor
+        return f_tensor, w_tensor
 
 
 # ============================================================
-# 5. 동적 α 스케줄러
+# 6. 동적 α 스케줄러
 # ============================================================
 class DynamicAlphaScheduler:
     def __init__(self, alpha_min=0.01, alpha_max=2.0, target_risk=0.1):
@@ -333,8 +416,9 @@ class DynamicAlphaScheduler:
         self.current_alpha = alpha_min
 
     def step(self, r_tensor, r_max, cascade_detected=False):
-        r_excess_ratio = (r_tensor > r_max).float().mean().item()
-        error = r_excess_ratio - self.target_risk
+        # R이 공명이므로 위험 = R이 낮은 상태
+        r_deficit_ratio = (r_tensor < r_max * 0.2).float().mean().item()
+        error = r_deficit_ratio - self.target_risk
 
         self.integral_error = 0.9 * self.integral_error + error
         derivative = error - self.prev_error
@@ -366,7 +450,7 @@ class DynamicAlphaScheduler:
 
 
 # ============================================================
-# 6. 유틸리티
+# 7. 유틸리티
 # ============================================================
 def print_fusion_schedule(scheduler, epochs=100, interval=10):
     print("\n" + "=" * 70)
@@ -395,63 +479,109 @@ def print_fusion_schedule(scheduler, epochs=100, interval=10):
 
 def validate_tensor_shapes(agi_model, dataloader):
     print("\n" + "=" * 70)
-    print("Shape 검증")
+    print("Shape 검증 (v3.8.1)")
     print("=" * 70)
 
     batch = next(iter(dataloader))
-    inputs, task_reward, alignment_cost, confidence = batch
-    print(f"inputs: {inputs.shape} | task_reward: {task_reward.shape} | "
-          f"alignment_cost: {alignment_cost.shape} | confidence: {confidence.shape}")
+    inputs, task_reward, alignment_cost, task_loss, pred_ent, grad_norm, w_norm = batch
+    print(f"inputs: {inputs.shape} | task_reward: {task_reward.shape}")
+    print(f"task_loss: {task_loss.shape} | pred_ent: {pred_ent.shape}")
+    print(f"grad_norm: {grad_norm.shape} | w_norm: {w_norm.shape}")
 
     with torch.no_grad():
-        F, W, R = agi_model(inputs)
-        print(f"F: {F.shape} | W: {W.shape} | R: {R.shape}")
+        F, W = agi_model(inputs)
+        print(f"F: {F.shape} | W: {W.shape}")
 
     assert inputs.dim() == 2
     assert inputs.shape[-1] == 10
     assert F.shape == (dataloader.batch_size, 1)
     assert W.shape == (dataloader.batch_size, 1)
-    assert R.shape == (dataloader.batch_size, 1)
     print("✅ 모든 shape 검증 통과")
 
 
-def demo_resonance_quality():
-    """F/W 변화가 resonance_quality에 영향 없음을 확인"""
+def demo_resonance_conversion():
+    """위험 신호 → 공명 강도 변환 검증"""
     print("\n" + "=" * 70)
-    print("resonance_quality vs performance_score 분리 검증 (v3.7.1)")
+    print("ResonanceFromRiskInterface: 위험 → 공명 변환 (v3.8.1)")
+    print("r_max=8.0, temperature=2.0")
+    print("=" * 70)
+
+    interface = ResonanceFromRiskInterface(r_max=8.0, temperature=2.0)
+
+    scenarios = [
+        ("정상 학습 (loss=0.1)",           0.1,  0.2,  0.5,  2.0),
+        ("약한 불안정 (loss=1.0)",          1.0,  0.5,  0.8,  3.0),
+        ("불안정 (loss=3.0)",              3.0,  1.5,  1.2,  4.0),
+        ("혼돈 (loss=5.0, ent=3.0)",       5.0,  3.0,  2.0,  6.0),
+        ("폭주 (loss=10, grad=5.0)",       10.0,  2.0,  5.0, 15.0),
+    ]
+
+    print(f"{'시나리오':<35} {'R (공명)':<10} {'의미'}")
+    print("-" * 60)
+
+    for name, loss, ent, grad_norm, w_norm in scenarios:
+        r = interface.compute(
+            task_loss=torch.tensor([[loss]]),
+            prediction_entropy=torch.tensor([[ent]]),
+            gradient_norm=torch.tensor([[grad_norm]]),
+            weight_norm=torch.tensor([[w_norm]])
+        )
+
+        if r.item() > 6.0:
+            desc = "🟢 강한 공명 (안정)"
+        elif r.item() > 3.0:
+            desc = "🟡 중간 공명"
+        elif r.item() > 1.0:
+            desc = "🟠 약한 공명 (주의)"
+        else:
+            desc = "🔴 공명 붕괴 (위험)"
+
+        print(f"{name:<35} {r.item():<10.4f} {desc}")
+
+    print("-" * 60)
+    print("기대: 위험 높을수록 R 낮음 (공명 약함)")
+
+
+def demo_fwr_formula():
+    """E = F × W × R 수식 검증"""
+    print("\n" + "=" * 70)
+    print("E = F × W × R 수식 검증 (v3.8.1)")
     print("=" * 70)
 
     controller = FWRStabilityController(r_max=8.0, beta=0.1)
+    interface = ResonanceFromRiskInterface(r_max=8.0, temperature=2.0)
 
-    test_cases = [
-        ("F=1,   W=1, R=4 균일",    1.0,   1.0, [4.0,  4.0,  4.0,  4.0 ]),
-        ("F=10,  W=1, R=4 균일",    10.0,  1.0, [4.0,  4.0,  4.0,  4.0 ]),
-        ("F=100, W=1, R=4 균일",    100.0, 1.0, [4.0,  4.0,  4.0,  4.0 ]),
-        ("F=1,   W=1, R=0 dead",    1.0,   1.0, [0.01, 0.01, 0.01, 0.01]),
-        ("F=1,   W=1, R=20 과잉",   1.0,   1.0, [20.0, 20.0, 20.0, 20.0]),
-        ("F=1,   W=1, R 혼합 1~20", 1.0,   1.0, [1.0,  5.0,  10.0, 20.0]),
+    scenarios = [
+        ("정상 학습",   0.1,  0.2),
+        ("불안정",      3.0,  1.5),
+        ("폭주",       10.0,  3.0),
     ]
 
-    print(f"{'케이스':<28} {'RQ':<8} {'Perf':<10} {'안전모드'}")
-    print("-" * 60)
+    F = torch.tensor([[5.0]] * 4)
+    W = torch.tensor([[0.8]] * 4)
 
-    for name, f_val, w_val, r_vals in test_cases:
-        F = torch.tensor([[f_val]] * 4)
-        W = torch.tensor([[w_val]] * 4)
-        R = torch.tensor([[v] for v in r_vals])
-        _, _, rq, perf, safe = controller(F, W, R)
+    print(f"{'시나리오':<15} {'R':<8} {'E':<10} {'RQ':<8} {'안전모드'}")
+    print("-" * 55)
+
+    for name, loss, ent in scenarios:
+        R = interface.compute(
+            task_loss=torch.tensor([[loss]] * 4),
+            prediction_entropy=torch.tensor([[ent]] * 4)
+        )
+        E_out, _, rq, perf, safe = controller(F, W, R)
         controller.commit_state()
-        print(f"{name:<28} {rq.item():<8.4f} {perf.item():<10.4f} "
-              f"{'⚠️YES' if safe else '✅NO'}")
 
-    print("-" * 60)
-    print("기대: F/W 변화 → RQ 불변, Perf만 변함")
+        print(f"{name:<15} {R.mean().item():<8.4f} {E_out.mean().item():<10.4f} "
+              f"{rq.item():<8.4f} {'⚠️YES' if safe else '✅NO'}")
+
+    print("-" * 55)
+    print("기대: 위험 높을수록 R 낮음 → E 낮음 (FWR 원칙)")
 
 
 def demo_cascade_detection():
-    """[v3.7.1] 실시간 텐서 + peak 조건 cascade 감지 검증"""
+    """공명 붕괴 + 과잉 폭주 감지"""
     print("\n" + "=" * 70)
-    print("Cascade 감지 검증 (v3.7.1): 실시간 텐서 반영 + peak 조건")
+    print("Cascade 감지 (v3.8.1): 공명 붕괴 + 과잉 폭주")
     print("=" * 70)
 
     controller = FWRStabilityController(
@@ -461,59 +591,44 @@ def demo_cascade_detection():
     W = torch.tensor([[1.0]])
 
     scenarios = {
-        "고점 유지 (plateau)":          [10.0, 10.0, 10.0, 10.5],
-        "noise (8→8.1→8.15)":           [7.0,  8.0,  8.1,  8.15],
-        "완만한 상승":                   [7.0,  8.5,  9.0,  9.6 ],
-        "폭주 trajectory":               [5.0,  10.0, 15.0, 25.0],
-        "감소 중":                       [20.0, 15.0, 10.0, 8.0 ],
-        "peak spike (mean은 정상)":      [2.0,  2.0,  2.0,  2.0 ],  # peak만 높은 케이스
+        "정상 유지":                    [5.0,  5.0,  5.0,  5.0 ],
+        "완만한 하락":                  [5.0,  4.0,  3.5,  3.0 ],
+        "공명 붕괴 trajectory":         [5.0,  3.0,  1.5,  0.3 ],
+        "과잉 폭주 trajectory":         [5.0,  10.0, 15.0, 25.0],
+        "회복 중 (상승)":               [1.0,  2.0,  4.0,  6.0 ],
     }
 
-    # peak spike 케이스: 배치 내 한 원소만 극단값
-    peak_spike_r = torch.tensor([[2.0], [2.0], [2.0], [15.0]])
-
-    print(f"{'시나리오':<30} {'Cascade'}")
-    print("-" * 44)
+    print(f"{'시나리오':<28} {'Cascade'}")
+    print("-" * 42)
 
     for name, r_seq in scenarios.items():
         controller.full_reset()
+        for r_val in r_seq:
+            R = torch.tensor([[r_val]])
+            controller(F, W, R)
+            controller.commit_state()
+        result = controller.detect_resonance_cascade(
+            torch.tensor([[r_seq[-1]]])
+        )
+        print(f"{name:<28} {'⚠️ YES' if result else '✅ NO'}")
 
-        if name == "peak spike (mean은 정상)":
-            # 히스토리 3개 쌓기
-            for r_val in [5.0, 10.0, 12.0]:
-                R = torch.tensor([[r_val]])
-                controller(F, W, R)
-                controller.commit_state()
-            # 현재 배치: mean=5.25이지만 peak=15
-            _, _, _, _, _ = controller(F, W, torch.tensor([[2.0]]))
-            result = controller.detect_resonance_cascade(peak_spike_r)
-        else:
-            for r_val in r_seq:
-                R = torch.tensor([[r_val]])
-                controller(F, W, R)
-                controller.commit_state()
-            result = controller.detect_resonance_cascade(
-                torch.tensor([[r_seq[-1]]])
-            )
-
-        print(f"{name:<30} {'⚠️ YES' if result else '✅ NO'}")
-
-    print("-" * 44)
-    print("기대: 고점유지/noise→NO | 폭주/peak spike→YES | 감소→NO")
+    print("-" * 42)
+    print("기대: 정상/완만/회복→NO | 공명붕괴/과잉폭주→YES")
 
 
 # ============================================================
-# 7. 통합 학습 루프
+# 8. 통합 학습 루프
 # ============================================================
-def train_fwr_agi_with_curriculum(
+def train_fwr_agi_v381(
     agi_model,
     fwr_controller,
     alpha_scheduler,
     reward_interface,
+    resonance_interface,
     fusion_scheduler,
     dataloader,
     epochs=100,
-    target_e_value=5.0
+    target_e_value=None   # None이면 첫 에포크 E 평균으로 자동 설정
 ):
     optimizer = optim.Adam(
         list(agi_model.parameters()) + list(fwr_controller.parameters()),
@@ -523,16 +638,13 @@ def train_fwr_agi_with_curriculum(
 
     ema_reset_interval = 50
     integral_reset_interval = 20
+    auto_target = target_e_value is None
 
     print("\n" + "=" * 70)
-    print("FWR AGI Training with Curriculum Fusion (v3.7.1)")
+    print("FWR AGI Training v3.8.1 (E = F × W × R, R from Risk)")
     print(f"Dataset: {len(dataloader.dataset)} samples | Batch: {dataloader.batch_size}")
-    print(f"Fusion: agi=[{fusion_scheduler.agi_ratio_min:.1f}→{fusion_scheduler.agi_ratio_max:.1f}] "
-          f"mid={fusion_scheduler.midpoint_epoch} temp={fusion_scheduler.temperature}")
-    print(f"PID α: [{alpha_scheduler.alpha_min}, {alpha_scheduler.alpha_max}] "
-          f"target_risk={alpha_scheduler.target_risk}")
-    print(f"rq_threshold={fwr_controller.rq_threshold} | beta={fwr_controller.beta} | "
-          f"v_th={fwr_controller.velocity_threshold} | a_th={fwr_controller.acc_threshold}")
+    print(f"target_e_value: {'auto (첫 에포크 기준)' if auto_target else target_e_value}")
+    print(f"rq_threshold={fwr_controller.rq_threshold} | r_max={fwr_controller.r_max}")
     print("=" * 70)
 
     for epoch in range(epochs):
@@ -540,44 +652,62 @@ def train_fwr_agi_with_curriculum(
         epoch_total_loss = 0.0
         epoch_rq = 0.0
         epoch_perf = 0.0
+        epoch_r_mean = 0.0
         n_batches = 0
         last_cascade = False
 
         agi_ratio, reward_ratio = fusion_scheduler.update(epoch)
 
         for batch in dataloader:
-            inputs, task_reward, alignment_cost, confidence = batch
+            inputs, task_reward, alignment_cost, task_loss, pred_ent, grad_norm, w_norm = batch
 
-            F_pred, W_pred, R_pred = agi_model(inputs)
+            # 1. AGI 코어: F, W 출력
+            F_pred, W_pred = agi_model(inputs)
 
-            F_reward, W_reward, R_reward = reward_interface.extract_fwr_from_reward(
-                task_reward, alignment_cost, confidence
+            # 2. 보상 신호 → F, W
+            F_reward, W_reward = reward_interface.extract_fw_from_reward(
+                task_reward, alignment_cost
             )
 
+            # 3. R: 실측 위험 → 공명 강도 변환
+            R_measured = resonance_interface.compute(
+                task_loss=task_loss,
+                prediction_entropy=pred_ent,
+                gradient_norm=grad_norm,
+                weight_norm=w_norm
+            )
+
+            # 4. 커리큘럼 융합 (F, W만)
             F_combined = F_pred * agi_ratio + F_reward * reward_ratio
             W_combined = W_pred * agi_ratio + W_reward * reward_ratio
-            R_combined = R_pred * agi_ratio + R_reward * reward_ratio
 
+            # 5. FWR 컨트롤러
             E_out, R_adj, rq, perf, is_safe_mode = fwr_controller(
-                F_combined, W_combined, R_combined
+                F_combined, W_combined, R_measured
             )
 
-            # [v3.7.1] 실시간 텐서 직접 전달 (링 버퍼 지연 제거)
-            is_cascade = fwr_controller.detect_resonance_cascade(R_combined)
+            # 6. target_e_value 자동 설정 (첫 배치)
+            if auto_target and target_e_value is None and epoch == 0 and n_batches == 0:
+                target_e_value = perf.item()
+                print(f"  [Auto target_e_value = {target_e_value:.4f}]")
+
+            # 7. 폭주 감지
+            is_cascade = fwr_controller.detect_resonance_cascade(R_measured)
             last_cascade = is_cascade
 
-            dynamic_alpha = alpha_scheduler.step(R_combined, fwr_controller.r_max, is_cascade)
+            # 8. 동적 α
+            dynamic_alpha = alpha_scheduler.step(R_measured, fwr_controller.r_max, is_cascade)
 
+            # 9. Loss
             target_E = torch.ones_like(E_out) * target_e_value
             main_loss = criterion_main(E_out, target_E)
-
-            # [v3.7.1] current_r_mean/peak 전달로 gradient 연결
             aux_loss = fwr_controller.get_auxiliary_loss(
-                current_r_mean=R_combined.mean(),
-                current_r_peak=R_combined.max()
+                current_r_mean=R_measured.mean(),
+                current_r_peak=R_measured.max()
             )
             total_loss = main_loss + dynamic_alpha * aux_loss
 
+            # 10. 역전파
             optimizer.zero_grad()
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(agi_model.parameters(), max_norm=1.0)
@@ -590,6 +720,7 @@ def train_fwr_agi_with_curriculum(
             epoch_total_loss += total_loss.item()
             epoch_rq += rq.item()
             epoch_perf += perf.item()
+            epoch_r_mean += R_measured.mean().item()
             n_batches += 1
 
         if (epoch + 1) % ema_reset_interval == 0:
@@ -603,8 +734,9 @@ def train_fwr_agi_with_curriculum(
             avg_total = epoch_total_loss / max(n_batches, 1)
             avg_rq = epoch_rq / max(n_batches, 1)
             avg_perf = epoch_perf / max(n_batches, 1)
+            avg_r = epoch_r_mean / max(n_batches, 1)
             print(f"Epoch {epoch+1:03d} | Total: {avg_total:.4f} Main: {avg_main:.4f} | "
-                  f"RQ: {avg_rq:.4f} Perf: {avg_perf:.4f} | "
+                  f"RQ: {avg_rq:.4f} Perf: {avg_perf:.4f} R: {avg_r:.4f} | "
                   f"α: {alpha_scheduler.current_alpha:.4f} | "
                   f"AGI%: {agi_ratio:.2f} | "
                   f"SafeEMA: {fwr_controller.safe_mode_ema.item():.4f} | "
@@ -614,11 +746,11 @@ def train_fwr_agi_with_curriculum(
 
 
 # ============================================================
-# 8. 추론 테스트
+# 9. 추론 테스트
 # ============================================================
-def test_trained_model(agi_model, fwr_controller, fusion_scheduler):
+def test_trained_model(agi_model, fwr_controller, resonance_interface, fusion_scheduler):
     print("\n" + "=" * 70)
-    print("추론 테스트")
+    print("추론 테스트 (v3.8.1)")
     print("=" * 70)
 
     agi_model.eval()
@@ -626,14 +758,21 @@ def test_trained_model(agi_model, fwr_controller, fusion_scheduler):
 
     with torch.no_grad():
         inputs_normal = torch.randn(4, 10)
-        F, W, R = agi_model(inputs_normal)
+        F, W = agi_model(inputs_normal)
+
+        # 추론: 정상 환경 (loss 낮음 → R 높음)
+        R = resonance_interface.compute(
+            task_loss=torch.ones(4, 1) * 0.1,
+            prediction_entropy=torch.ones(4, 1) * 0.2
+        )
+
         E_out, R_adj, rq, perf, safe = fwr_controller(F, W, R)
 
-        print(f"F:\n{F}")
-        print(f"W:\n{W}")
-        print(f"R (원본):\n{R}")
-        print(f"R (조정):\n{R_adj}")
-        print(f"E:\n{E_out}")
+        print(f"F (추진력):\n{F}")
+        print(f"W (구조력):\n{W}")
+        print(f"R (공명-변환):\n{R}")
+        print(f"R (공명-조정):\n{R_adj}")
+        print(f"E (창발 에너지):\n{E_out}")
         print(f"resonance_quality: {rq.item():.4f}")
         print(f"performance_score: {perf.item():.4f}")
         print(f"안전 모드: {'⚠️ YES' if safe else '✅ NO'}")
@@ -668,7 +807,12 @@ if __name__ == "__main__":
         acc_threshold=0.5,
     )
     alpha_scheduler = DynamicAlphaScheduler(alpha_min=0.01, alpha_max=2.0, target_risk=0.1)
-    reward_interface = RewardSignalInterface(alignment_weight=0.3, confidence_scale=5.0)
+    reward_interface = RewardSignalInterface(alignment_weight=0.3)
+    resonance_interface = ResonanceFromRiskInterface(
+        r_max=8.0,
+        temperature=2.0,
+        alpha=0.4, beta=0.3, gamma=0.2, delta=0.1
+    )
 
     fusion_scheduler = CurriculumFusionScheduler(
         agi_ratio_min=0.1,
@@ -680,20 +824,23 @@ if __name__ == "__main__":
 
     print_fusion_schedule(fusion_scheduler, epochs=EPOCHS, interval=10)
     validate_tensor_shapes(agi_model, dataloader)
-    demo_resonance_quality()
+    demo_resonance_conversion()
+    demo_fwr_formula()
     demo_cascade_detection()
 
-    agi_model, fwr_controller, alpha_scheduler = train_fwr_agi_with_curriculum(
+    agi_model, fwr_controller, alpha_scheduler = train_fwr_agi_v381(
         agi_model, fwr_controller, alpha_scheduler, reward_interface,
-        fusion_scheduler, dataloader, epochs=EPOCHS, target_e_value=5.0
+        resonance_interface, fusion_scheduler, dataloader,
+        epochs=EPOCHS, target_e_value=None
     )
 
     print(f"\n{'='*70}")
-    print("✅ 학습 완료")
+    print("✅ 학습 완료 (v3.8.1)")
     print(f"  safety_margin:  {fwr_controller.safety_margin.item():.4f}")
     print(f"  최종 α:         {alpha_scheduler.current_alpha:.4f}")
     print(f"  safe_mode_ema:  {fwr_controller.safe_mode_ema.item():.4f}")
     print(f"  최종 융합 비율: AGI={fusion_scheduler.current_agi_ratio:.4f}, "
           f"Reward={fusion_scheduler.current_reward_ratio:.4f}")
 
-    test_trained_model(agi_model, fwr_controller, fusion_scheduler)
+    test_trained_model(agi_model, fwr_controller, resonance_interface, fusion_scheduler)
+```
