@@ -30,9 +30,9 @@ FWR은 세상의 모든 시스템을 **5개의 질문**으로 바라보고, 이�
 
 ---
 
-### W — Wave/Structure: 그것을 담을 그릇은 있는가?
+### W — (Wave-formed Structure): 그것을 담을 그릇은 있는가?
 
-흐름이 들어왔다고 해서 끝이 아닙니다. 그 흐름을 받아서 변환할 **구조(Structure)**가 있어야 합니다.
+흐름이 들어왔다고 해서 끝이 아닙니다. 그 흐름을 받아서 변환할 **구조W (Wave-formed Structure)**가 있어야 합니다.
 
 조직이라면 프로세스와 문화와 시스템이, 사람이라면 습관과 루틴과 환경이 이 구조에 해당합니다.
 
@@ -226,7 +226,7 @@ FWR은 각 도메인의 기존 수리모델을 공통 변수(F, W, C, η, T)에 
 | FWR | 물리학 대응 | 수식 예시 |
 |-----|------------|-----------|
 | **F** (Flow) | 에너지 유입 (Energy Flux) | Φ_E = dE/dt |
-| **W** (Structure) | 포텐셜 우물 (Potential Well) | U(x) = -∫F(x)dx |
+| **W** (Wave-formed Structure) | 포텐셜 우물 (Potential Well) | U(x) = -∫F(x)dx |
 | **C** (Coherence) | 위상 정렬 (Phase Coherence) | cos(θ₁−θ₂) |
 | **η** (Efficiency) | 열효율 (Thermal Efficiency) | η = W_out / Q_in |
 | **T** (History) | 누적 엔트로피 | S = ∫ dQ/T |
@@ -240,7 +240,7 @@ FWR은 각 도메인의 기존 수리모델을 공통 변수(F, W, C, η, T)에 
 | FWR | 경제학 대응 | 수식 예시 |
 |-----|------------|-----------|
 | **F** (Flow) | 자본 유입 (Capital Inflow) | I(t) |
-| **W** (Structure) | 생산 구조 (Production Structure) | Y = A·K^α·L^(1−α) |
+| **W** (Wave-formed Structure)| 생산 구조 (Production Structure) | Y = A·K^α·L^(1−α) |
 | **C** (Coherence) | 시장 조화 (Market Coherence) | Supply-Demand Elasticity |
 | **η** (Efficiency) | 생산성 (Productivity) | Y/L |
 | **T** (History) | 누적 부채/자산 | ∫₀ᵗ (Y−C)dt |
@@ -254,7 +254,7 @@ FWR은 각 도메인의 기존 수리모델을 공통 변수(F, W, C, η, T)에 
 | FWR | 신경과학 대응 | 수식 예시 |
 |-----|--------------|-----------|
 | **F** (Flow) | 감각 입력 (Sensory Input) | I(t) |
-| **W** (Structure) | 신경망 구조 (Neural Topology) | 연결 가중치 W_ij |
+| **W** (Wave-formed Structure) | 신경망 구조 (Neural Topology) | 연결 가중치 W_ij |
 | **C** (Coherence) | 신경 동기화 (Neural Synchrony) | Phase Locking Value |
 | **η** (Efficiency) | 정보 전달 효율 | MI / H (Mutual Info / Entropy) |
 | **T** (History) | 시냅스 가소성 (Synaptic Plasticity) | Δw_ij ∝ STDP |
@@ -268,7 +268,7 @@ FWR은 각 도메인의 기존 수리모델을 공통 변수(F, W, C, η, T)에 
 | FWR | 조직론 대응 | 수식 예시 |
 |-----|------------|-----------|
 | **F** (Flow) | 자원·정보 유입 | Resource Inflow |
-| **W** (Structure) | 조직도·프로세스 | Organizational Chart |
+| **W** (Wave-formed Structure) | 조직도·프로세스 | Organizational Chart |
 | **C** (Coherence) | 비전-전략-실행 정렬 | KPI Alignment Index |
 | **η** (Efficiency) | 실행력 / 생산성 | Output / Input |
 | **T** (History) | 조직 문화·관성 | Cultural Accumulation |
@@ -282,7 +282,7 @@ FWR은 각 도메인의 기존 수리모델을 공통 변수(F, W, C, η, T)에 
 | FWR | 스포츠 대응 | 수식 예시 |
 |-----|------------|-----------|
 | **F** (Flow) | 자금·유망주·전술 유입 | Transfer Budget, La Masia Output |
-| **W** (Structure) | 포메이션·팀 구성 | 4-3-3, Age Distribution |
+| **W** (Wave-formed Structure) | 포메이션·팀 구성 | 4-3-3, Age Distribution |
 | **C** (Coherence) | 감독-선수-팬 정렬 | Tactical Fit, Fan Trust |
 | **η** (Efficiency) | 골 결정력·부상 관리 | Goals / xG, Injury Rate |
 | **T** (History) | 구단 정체성·과거 영광 | Club DNA, UCL History |
@@ -296,7 +296,7 @@ FWR은 각 도메인의 기존 수리모델을 공통 변수(F, W, C, η, T)에 
 | 변수 | 대응 원칙 |
 |------|-----------|
 | **F** (Flow) | 시간에 따라 시스템에 **유입**되는 양적·질적 요소 |
-| **W** (Structure) | 유입된 흐름이 **머무르고 변환되는 틀** |
+| **W** (Wave-formed Structure) | 유입된 흐름이 **머무르고 변환되는 틀** |
 | **C** (Coherence) | 구성 요소 간 **방향·위상·의도의 일치도** (0~1) |
 | **η** (Efficiency) | 입력 대비 **유효 출력의 비율** (손실 제외) |
 | **T** (History) | 과거 공명이 현재에 **남긴 누적 영향** (망각·증폭 포함) |
