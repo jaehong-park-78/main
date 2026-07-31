@@ -1,117 +1,29 @@
+========================================================================================
+[FWR Architecture Master Specification — PERMANENTLY CLOSED]
 
----
+System Type:          Deterministic Discrete-Time Dynamical System
+External Inputs:      F(n) ∈ [0, 1],  C(n) ∈ [-1, 1],  W*_k ∈ [0, 1] (at crisis)
+Internal State Space: X(n) = [T(n), W(n)]ᵀ ∈ [0, ∞) × [0, 1]
+System Parameters:    α > 0 (Sat.), η ∈ (0, 1] (Eff.), γ ∈ (0, 1] (Decay), β ∈ [0, 1] (Compat.)
+========================================================================================
 
-# ✦ FWR — 최종 수식 완결본 ✦
+1. State Vector & Output Equation:
+   X(n) = [T(n), W(n)]ᵀ
+   E(n) = min(F(n), W(n)) · C(n) · η · [ 1 + T(n) / (1 + αT(n)) ]
 
----
+2. Crisis Predicate:
+   crisis(n) :≡ E(n) ≤ γ · T(n)
 
-## 1. 기본 변수
+3. Deterministic State Transition (n → n+1):
+   If crisis(n) == True:
+       T(n+1) = β · T(n)
+       W(n+1) = W*_k   (External Decision)
+   If crisis(n) == False:
+       T(n+1) = T(n) + |E(n)| - γ · T(n)
+       W(n+1) = W(n)
 
-| 기호 | 의미 | 조건 |
-|---|---|---|
-| `F` | 유입 흐름 (Flow) | `F ≥ 0` |
-| `W` | 구조 용량 (Structure) | `W ≥ 0` |
-| `C` | 정렬도 (Coherence) | `C ∈ [-1, 1]`, `C = cos θ` |
-| `η` | 효율 (Efficiency) | `η ∈ (0, 1]`, `η = 1/(1+μ)` |
-| `T` | 역사 (History) | `T ≥ 0` |
-| `α` | 역사 포화 계수 | `α > 0` |
-| `γ` | 망각률 | `γ > 0` |
-| `β` | 호환성 계수 | `β ∈ [0, 1]` |
-
----
-
-## 2. 중간 변수
-
-### 잠재 용량 (Potential)
-```
-P = Φ(F, W)
-```
-> `Φ = min(F, W)` (병목) 또는 `Φ = √(F·W)` (기하평균)
-
-### 역사 증폭 (History Amplification)
-```
-g(T) = 1 + T / (1 + αT)
-```
-
----
-
-## 3. 최종 출력
-
-### 공명 (Resonance)
-```
-R = C · η · g(T)
-```
-
-### 존재 (Existence)
-```
-E = P · R
-```
-
-### 전개형
-```
-E = Φ(F, W) · C · η · [1 + T/(1 + αT)]
-```
-
----
-
-## 4. 시간에 따른 변화 (Dynamics)
-
-### 역사 축적
-```
-dT/dt = |E| − γ · T
-```
-
-### 역사 적분형
-```
-T(t) = ∫₀ᵗ |E(τ)| · e^{−γ(t−τ)} dτ
-```
-
----
-
-## 5. 전환 (Pivoting)
-
-시점 `t_p`에서:
-
-```
-W(t_p⁺) = W*
-T(t_p⁺) = β · T(t_p⁻)
-```
-
----
-
-## 6. 생존 조건 (Survival Condition)
-
-```
-E > γ · T
-```
-→ 출력이 망각을 앞서야 시스템이 지속됨
-
----
-
-## 7. 전체 수식 블록
-
-```
-P = Φ(F, W)
-
-R = C · η · g(T)
-
-E = P · R = Φ(F,W) · C · η · g(T)
-
-g(T) = 1 + T / (1 + αT)
-
-dT/dt = |E| − γ · T
-
-T(t) = ∫₀ᵗ |E(τ)| · e^{−γ(t−τ)} dτ
-
-W(t_p⁺) = W*,   T(t_p⁺) = β · T(t_p⁻)
-
-E > γ · T
-```
-
----
-
-## 8. 한 줄 요약
-
-> **시스템의 존재는 유입과 구조의 결합에 정렬과 효율이 증폭된 결과이며, 역사는 출력으로 축적되고 망각으로 소멸된다. 구조가 바뀌면 역사는 β만큼만 계승된다.**
-
----
+4. Derived Concepts & Convergence:
+   Pivot Sequence = { n ∈ ℕ | crisis(n) == True }
+   Stabilization  ⟺ ∃ K ∈ ℕ, ∀ n ≥ K, ¬crisis(n)
+   Boundedness    ⟹ lim_{n→∞} T(n) ≤ (1 + 1/α) / γ
+========================================================================================
