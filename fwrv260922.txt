@@ -1,4 +1,4 @@
-# FWR v1.0
+# FWR v1.0 (Rev.1)
 
 ## Multiplicative Core Framework
 
@@ -60,32 +60,59 @@ Coherence는 시스템 내부 요소들의 결속 또는 정합성을 나타낸�
 범위:
 
 * −1 ≤ C ≤ 1
-* C = 0 → Coherence가 없는 정상 상태
+* C = 0 → 정합성 없음
 
 C는 방향성을 가질 수 있으므로 음수와 양수를 허용한다.
 
 ---
 
-### N — Entropy Contribution
+### N — Entropy Efficiency
 
-N은 특정 Subsystem이 전체 System의 Entropy에 기여하는 비율이다.
+N은 Subsystem이 Whole System의 엔트로피에 기여하지 않은 비율, 즉 손실 없이 유효하게 전환된 비율이다.
 
 정의:
 
-N = S_subsystem / S_whole_system
+N = 1 − (S_subsystem / S_whole system)
+
+또는 동등하게,
+
+N = (S_whole system − S_subsystem) / S_whole system
 
 여기서 Subsystem은 Whole System의 하위 구성요소이다.
 
-따라서 N의 범위는 다음과 같이 정의된다.
+범위:
 
 0 ≤ N ≤ 1
 
-N의 범위가 0과 1 사이에 존재하는 것은 Subsystem과 Whole System 사이의 준가법성(Subadditivity) 및 부분-전체 관계에서 구조적으로 발생한다고 본다.
+방향:
 
-중요한 점:
+N이 클수록 E가 커진다.
+
+"손실 없이 잘 전환될수록 존재가 강해진다."
+
+### N의 범위 근거 — 단조성(Monotonicity)
+
+N의 범위가 [0, 1]에 존재하는 것은 다음 단조성에 기인한다.
+
+S_subsystem ≤ S_whole system
+
+이는 고전적 섀넌 엔트로피(Shannon entropy)에서 성립하며, 다음 경우에는 깨질 수 있다.
+
+* 양자 얽힘 상태
+
+  * 예: 벨 상태 |Φ+⟩
+  * 전체계 엔트로피 0, 부분계 엔트로피 > 0
+* 비단조적 엔트로피
+
+  * 일부 Tsallis 엔트로피
+  * 일부 Rényi 엔트로피
+
+따라서 FWR v1.0 Definition Layer는 고전적 섀넌 엔트로피를 전제한다.
+
+### 중요한 점
 
 * 어떤 Subsystem을 사용할 것인지는 정의 단계에서 고정하지 않는다.
-* 정의 단계에서는 단지 “Subsystem / Whole System”이라는 관계만 고정한다.
+* 정의 단계에서는 단지 "Subsystem / Whole System"이라는 관계만 고정한다.
 * 구체적인 Subsystem의 선택은 Extension/Application Layer에서 결정한다.
 
 ---
@@ -114,6 +141,24 @@ E = F × W × C × N × T
 E = 0
 
 이 된다.
+
+---
+
+## §2.1. 0의 통일된 의미
+
+모든 변수의 0은 동일한 방식으로 해석된다.
+
+| 변수    | 0의 의미                    |
+| ----- | ------------------------ |
+| F = 0 | 흐름 없음                    |
+| W = 0 | 구조 없음                    |
+| C = 0 | 정합성 없음                   |
+| N = 0 | 엔트로피 효율 없음 (모든 엔트로피가 손실) |
+| T = 0 | 이력 없음                    |
+
+모두 "없음"이며, 모두 E = 0을 만든다.
+
+어느 하나도 특별 취급하지 않는다.
 
 ---
 
@@ -181,15 +226,23 @@ Tₙ = f(E₁:ₙ)
 
 ## §4. Log Form
 
-C ≠ 0, N > 0, T > 0인 경우 로그 형태로 표현할 수 있다.
+### 적용 조건
+
+로그 형태는 다음 조건이 모두 성립할 때만 사용한다.
+
+C ≠ 0, N > 0, T > 0, F > 0, W > 0
+
+### 로그 형태
 
 C = s_C × |C|
 
 여기서,
 
-s_C ∈ {−1, 0, +1}
+s_C ∈ {−1, +1}
 
 이다.
+
+C ≠ 0 조건에서 s_C = 0은 발생하지 않는다.
 
 따라서,
 
@@ -201,7 +254,9 @@ sign(E) = sign(C)
 
 로 표현된다.
 
-중요한 점은 이 로그식 역시 새로운 통계모형이 아니라 §1의 Identity를 로그 축으로 다시 표현한 것이다.
+### 중요
+
+이 로그식은 새로운 통계모형이 아니라 §1의 Identity를 로그 축으로 다시 표현한 것이다.
 
 따라서:
 
@@ -211,13 +266,15 @@ sign(E) = sign(C)
 * 추정식이 아니다.
 * 검증을 위한 회귀식과 동일시하지 않는다.
 
+### 로그형의 유용성
+
+이 재서술은 곱셈 구조를 덧셈 구조로 바꿔 각 변수의 기여를 분해·비교·시각화하는 데 사용된다.
+
 ### 경계값
 
-다음과 같은 경우에는 로그를 사용하지 않는다.
+다음 중 하나라도 성립하면 로그를 사용하지 않는다.
 
-* C = 0
-* N = 0
-* T = 0
+C = 0 또는 N = 0 또는 T = 0 또는 F = 0 또는 W = 0
 
 이 경우에는 원래의 Identity를 직접 사용한다.
 
@@ -243,7 +300,7 @@ C는 이미 −1에서 +1 사이로 제한되어 있으므로 별도의 동일�
 
 ### N
 
-N은 Subsystem Entropy와 Whole System Entropy의 비율로 정의되므로,
+N은 Subsystem Entropy와 Whole System Entropy의 비율로부터 유도되므로,
 
 0 ≤ N ≤ 1
 
@@ -265,7 +322,7 @@ FWR의 기본 관점은 다음과 같다.
 
 Existence는
 
-Flow · Wave · Coherence · Entropy Contribution · History
+Flow · Wave · Coherence · Entropy Efficiency · History
 
 의 결합으로 발생한다.
 
@@ -300,7 +357,7 @@ FWR v1.0에서 고정되는 내용:
 * E = F × W × R
 * 각 변수의 기본 의미
 * 각 변수의 기본 범위
-* N의 기본 정의
+* N의 기본 정의 (Entropy Efficiency)
 * Identity로서의 Core 구조
 
 ### Extension Layer
@@ -321,27 +378,26 @@ FWR v1.0에서 고정되는 내용:
 
 ## §8. Core Structure Summary
 
-FWR의 구조를 간단하게 정리하면 다음과 같다.
+| 기호 | 의미                 | 범위      |
+| -- | ------------------ | ------- |
+| F  | Flow               | F ≥ 0   |
+| W  | Wave               | W ≥ 0   |
+| C  | Coherence          | [−1, 1] |
+| N  | Entropy Efficiency | [0, 1]  |
+| T  | History            | T ≥ 0   |
+| E  | Existence          | ℝ       |
 
-F — Flow
-W — Wave
-C — Coherence
-N — Entropy Contribution
-T — History
-
-그리고,
+Resonance:
 
 R = C × N × T
 
-따라서,
+Existence:
 
 E = F × W × R
 
-최종적으로,
+FWR Core:
 
 E = F × W × C × N × T
-
-이다.
 
 ---
 
@@ -351,11 +407,7 @@ FWR v1.0은 Multiplicative Core Framework의 Definition Layer이다.
 
 핵심은 복잡한 수식을 추가하는 것이 아니라,
 
-Flow
-× Wave
-× Coherence
-× Entropy Contribution
-× History
+Flow × Wave × Coherence × Entropy Efficiency × History
 
 라는 다섯 요소의 곱으로 Existence를 정의하는 것이다.
 
@@ -365,10 +417,10 @@ E = F × W × C × N × T
 
 구체적인 Dynamics와 Application은 이후 Extension Layer에서 다룬다.
 
+
 ---
 
 ## Slogan
 
-“식은 단순하게, 변수는 엄격하게, 적용은 명확하게.”
 
-“한 방울 더하기 한 방울은 한 방울이다. 🌊”
+"한 방울 더하기 한 방울은 한 방울이다. 🌊"
