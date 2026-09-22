@@ -1,0 +1,374 @@
+# FWR v1.0
+
+## Multiplicative Core Framework
+
+---
+
+## §1. Core
+
+FWR의 핵심 구조는 다음과 같다.
+
+E = F × W × C × N × T
+
+또한 Resonance는 다음과 같이 정의한다.
+
+R = C × N × T
+
+따라서,
+
+E = F × W × R
+
+이 식은 하나의 Identity(항등식)이다.
+
+* 계수(coefficient)는 없다.
+* 잔차(residual)는 없다.
+* 근사식이 아니다.
+* 추정식이 아니다.
+
+즉, FWR v1.0에서는 위 식 자체가 존재(Existence)의 정의 구조이다.
+
+---
+
+## §2. Variables
+
+### F — Flow
+
+Flow는 시스템 내에서 발생하는 흐름이다.
+
+조건:
+
+* F ≥ 0
+* F = 0 → Flow가 없음
+
+---
+
+### W — Wave
+
+Wave는 시스템 안에서 형성되는 구조 또는 파동이다.
+
+조건:
+
+* W ≥ 0
+* W = 0 → 구조/Wave가 없음
+
+---
+
+### C — Coherence
+
+Coherence는 시스템 내부 요소들의 결속 또는 정합성을 나타낸다.
+
+범위:
+
+* −1 ≤ C ≤ 1
+* C = 0 → Coherence가 없는 정상 상태
+
+C는 방향성을 가질 수 있으므로 음수와 양수를 허용한다.
+
+---
+
+### N — Entropy Contribution
+
+N은 특정 Subsystem이 전체 System의 Entropy에 기여하는 비율이다.
+
+정의:
+
+N = S_subsystem / S_whole_system
+
+여기서 Subsystem은 Whole System의 하위 구성요소이다.
+
+따라서 N의 범위는 다음과 같이 정의된다.
+
+0 ≤ N ≤ 1
+
+N의 범위가 0과 1 사이에 존재하는 것은 Subsystem과 Whole System 사이의 준가법성(Subadditivity) 및 부분-전체 관계에서 구조적으로 발생한다고 본다.
+
+중요한 점:
+
+* 어떤 Subsystem을 사용할 것인지는 정의 단계에서 고정하지 않는다.
+* 정의 단계에서는 단지 “Subsystem / Whole System”이라는 관계만 고정한다.
+* 구체적인 Subsystem의 선택은 Extension/Application Layer에서 결정한다.
+
+---
+
+### T — History
+
+History는 시스템의 과거 이력 또는 누적된 영향을 나타낸다.
+
+조건:
+
+* T ≥ 0
+* T = 0 → History가 없음
+
+T의 구체적인 동적 형태는 Definition Layer가 아니라 Extension Layer에서 다룬다.
+
+---
+
+### E — Existence
+
+E는 FWR 구조에서의 Existence를 나타낸다.
+
+E = F × W × C × N × T
+
+따라서 어떤 요소라도 0이 되면,
+
+E = 0
+
+이 된다.
+
+---
+
+## §3. T Operationalization
+
+T는 History를 표현하기 위한 여러 operational form을 가질 수 있다.
+
+### T-A. 감쇠 누적형
+
+Tₙ = (1 − γ)Tₙ₋₁ + |Eₙ₋₁|
+
+조건:
+
+* 0 < γ ≤ 1
+* T₀ ≥ ε_T > 0
+* 초기값 T₀는 사전에 고정한다.
+
+이 형태에서는 과거의 E가 누적되면서 동시에 감쇠한다.
+
+---
+
+### T-B. 누적 비율형
+
+Tₙ = Cumulative₁:ₙ₋₁ / (Cumulative₁:ₙ₋₁ + K)
+
+따라서,
+
+0 < Tₙ < 1
+
+이다.
+
+Cumulative가 0인 경우에도 T는 정확히 0이 되지 않고 0에 가까워지는 형태를 가진다.
+
+---
+
+### T-C. 상수형
+
+T ≡ 1
+
+이 경우,
+
+E = F × W × C × N
+
+이 된다.
+
+---
+
+### 시간 순서
+
+예측(Prediction)에서는 미래의 E를 사용하여 T를 만들 수 없으므로,
+
+Tₙ = f(E₁:ₙ₋₁)
+
+와 같이 과거 데이터만 사용한다.
+
+진단(Diagnosis)에서는 현재까지의 데이터를 사용할 수 있으므로,
+
+Tₙ = f(E₁:ₙ)
+
+와 같이 정의할 수 있다.
+
+예측과 진단의 시간 순서를 혼합하지 않는다.
+
+---
+
+## §4. Log Form
+
+C ≠ 0, N > 0, T > 0인 경우 로그 형태로 표현할 수 있다.
+
+C = s_C × |C|
+
+여기서,
+
+s_C ∈ {−1, 0, +1}
+
+이다.
+
+따라서,
+
+ln|E| = ln F + ln W + ln|C| + ln N + ln T
+
+그리고 부호는 별도로,
+
+sign(E) = sign(C)
+
+로 표현된다.
+
+중요한 점은 이 로그식 역시 새로운 통계모형이 아니라 §1의 Identity를 로그 축으로 다시 표현한 것이다.
+
+따라서:
+
+* 계수는 모두 1이다.
+* 절편은 0이다.
+* 오차항은 없다.
+* 추정식이 아니다.
+* 검증을 위한 회귀식과 동일시하지 않는다.
+
+### 경계값
+
+다음과 같은 경우에는 로그를 사용하지 않는다.
+
+* C = 0
+* N = 0
+* T = 0
+
+이 경우에는 원래의 Identity를 직접 사용한다.
+
+E = F × W × C × N × T = 0
+
+---
+
+## §5. Normalization
+
+F, W, T는 관측 전에 비음수 조건 또는 부호 분리 방식을 먼저 고정해야 한다.
+
+### F
+
+F ≥ 0
+
+### W
+
+W ≥ 0
+
+### C
+
+C는 이미 −1에서 +1 사이로 제한되어 있으므로 별도의 동일한 방식의 정규화가 필요하지 않다.
+
+### N
+
+N은 Subsystem Entropy와 Whole System Entropy의 비율로 정의되므로,
+
+0 ≤ N ≤ 1
+
+의 범위를 가진다.
+
+따라서 별도의 정규화는 필요하지 않다.
+
+단, 어떤 Subsystem을 사용할 것인지는 관측 이후 임의로 선택해서는 안 된다.
+
+Subsystem 지정 기준은 관측 전에 고정해야 한다.
+
+---
+
+## §6. Philosophy
+
+FWR은 복잡한 동역학 모델을 만드는 것을 목적으로 하지 않는다.
+
+FWR의 기본 관점은 다음과 같다.
+
+Existence는
+
+Flow · Wave · Coherence · Entropy Contribution · History
+
+의 결합으로 발생한다.
+
+즉,
+
+E = F × W × C × N × T
+
+이다.
+
+FWR v1.0은 Definition Layer이다.
+
+따라서 다음 요소들은 v1.0의 정의 자체를 변경하지 않는다.
+
+* Adaptive Decay
+* Boundary Conditions
+* Diagnostic Methods
+* 구체적인 N Subsystem 지정
+* 기타 Application-specific Dynamics
+
+이들은 Extension Layer에서 다룬다.
+
+---
+
+## §7. Definition Layer와 Extension Layer
+
+### Definition Layer
+
+FWR v1.0에서 고정되는 내용:
+
+* E = F × W × C × N × T
+* R = C × N × T
+* E = F × W × R
+* 각 변수의 기본 의미
+* 각 변수의 기본 범위
+* N의 기본 정의
+* Identity로서의 Core 구조
+
+### Extension Layer
+
+응용 단계에서 결정되는 내용:
+
+* T의 구체적인 Operational Form
+* N의 구체적인 Subsystem 지정
+* 시간에 따른 Dynamics
+* Adaptive Decay
+* Boundary Conditions
+* Domain-specific Diagnostics
+* Application-specific Measurement
+
+따라서 Extension이 추가되더라도 FWR v1.0의 Core Identity 자체를 변경하지 않는다.
+
+---
+
+## §8. Core Structure Summary
+
+FWR의 구조를 간단하게 정리하면 다음과 같다.
+
+F — Flow
+W — Wave
+C — Coherence
+N — Entropy Contribution
+T — History
+
+그리고,
+
+R = C × N × T
+
+따라서,
+
+E = F × W × R
+
+최종적으로,
+
+E = F × W × C × N × T
+
+이다.
+
+---
+
+## §9. Final Declaration
+
+FWR v1.0은 Multiplicative Core Framework의 Definition Layer이다.
+
+핵심은 복잡한 수식을 추가하는 것이 아니라,
+
+Flow
+× Wave
+× Coherence
+× Entropy Contribution
+× History
+
+라는 다섯 요소의 곱으로 Existence를 정의하는 것이다.
+
+E = F × W × C × N × T
+
+이 식은 FWR v1.0에서 Identity로 취급된다.
+
+구체적인 Dynamics와 Application은 이후 Extension Layer에서 다룬다.
+
+---
+
+## Slogan
+
+“식은 단순하게, 변수는 엄격하게, 적용은 명확하게.”
+
+“한 방울 더하기 한 방울은 한 방울이다. 🌊”
